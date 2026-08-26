@@ -1,0 +1,13 @@
+{
+  "name": "yara-python + ECS Guardian Trust",
+  "install": "./.cursor/install.sh",
+  "terminals": [
+    {
+      "name": "ecs-trust-server",
+      "command": "cd ecs-trust-graph && source ../.venv/bin/activate && exec python -m ecs_trust"
+    }
+  ],
+  "ports": [
+    8080
+  ]
+}

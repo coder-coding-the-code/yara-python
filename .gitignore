@@ -1,0 +1,13 @@
+.venv/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Artifacts from setup.py compiler feature checks (has_header/has_function)
+/tmp/
+tmp/
+a.out
+
