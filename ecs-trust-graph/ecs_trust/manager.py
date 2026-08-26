@@ -472,10 +472,20 @@ class TrustManager:
 
     def graph_payload(self) -> dict:
         g = self.as_networkx()
-        layout = nx.spring_layout(g, seed=7, k=1.3)
+        kind_order = ["user", "pack", "agent", "service_principal", "connector", "resource", "organization"]
+        buckets: dict[str, list[str]] = {k: [] for k in kind_order}
+        for nid, data in g.nodes(data=True):
+            kind = data.get("kind") or nid.split(":", 1)[0]
+            buckets.setdefault(kind, []).append(nid)
+        positions: dict[str, tuple[float, float]] = {}
+        row_gap, col_gap, x0, y0 = 150.0, 88.0, 70.0, 48.0
+        for row, kind in enumerate([k for k in kind_order if buckets.get(k)]):
+            nodes = sorted(buckets[kind])
+            for col, nid in enumerate(nodes):
+                positions[nid] = (x0 + col * col_gap, y0 + row * row_gap)
         nodes = []
         for nid, data in g.nodes(data=True):
-            x, y = layout.get(nid, (0.0, 0.0))
+            x, y = positions.get(nid, (40.0, 40.0))
             nodes.append(
                 {
                     "id": nid,
@@ -484,8 +494,8 @@ class TrustManager:
                     "status": data.get("status"),
                     "require_user_grant": data.get("require_user_grant"),
                     "risk": data.get("risk"),
-                    "x": round(float(x) * 420 + 480, 2),
-                    "y": round(float(y) * 280 + 300, 2),
+                    "x": x,
+                    "y": y,
                 }
             )
         edges = [
@@ -496,7 +506,7 @@ class TrustManager:
             }
             for u, v, d in g.edges(data=True)
         ]
-        return {"nodes": nodes, "edges": edges}
+        return {"nodes": nodes, "edges": edges, "width": 980, "height": 620}
 
     def _approval_ok(
         self,
