@@ -499,4 +499,5 @@ DELEGATES_TO {
 
 ---
 
-*文档依据讨论整理，可与 ECS Guardian Trust / Trust Manager / Runtime Policy Validator 产品设计对照使用。*
+*文档依据讨论整理，可与 ECS Guardian Trust / Trust Manager / Runtime Policy Validator 产品设计对照使用。*  
+*调用链方案见 `docs/ECS-Trust-Graph-Chain-Auth-Design.md`；OpenFGA 关系草图见 `docs/ECS-Trust-Graph-OpenFGA-Model.md`。*

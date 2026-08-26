@@ -374,4 +374,4 @@ pack_id / pack_version
 
 ---
 
-*本文可与 `docs/ECS-Trust-Graph-Design.md` 配套使用：前者讲总体 Trust Graph，本文专攻多 Agent 链上「何时验用户授权」。*
+*本文可与 `docs/ECS-Trust-Graph-Design.md` 配套使用：前者讲总体 Trust Graph，本文专攻多 Agent 链上「何时验用户授权」。落地关系模型见 `docs/ECS-Trust-Graph-OpenFGA-Model.md`。*
