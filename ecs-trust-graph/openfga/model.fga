@@ -1,0 +1,49 @@
+model
+  schema 1.1
+
+# ECS Guardian Trust — Agent Trust Graph (v1 archive)
+# 已被 v2（NetworkX + Cedar）取代，见 docs/ECS-Trust-Graph-v2-Design.md
+# 关系进图；require_user_grant 放 Registry；金额/深度/风险放策略层。
+
+type user
+  relations
+    define manager: [user]
+    define data_viewer: [user]
+
+type organization
+  relations
+    define member: [user]
+
+type pack
+  relations
+    define grantee: [user]
+    define entry: [agent]
+    define member: [agent]
+    define user_granted: [agent]
+
+type agent
+  relations
+    define owner: [user]
+    define grant: [user, pack#grantee]
+    define can_invoke: [agent]
+    define runs_as: [service_principal]
+    define in_pack: [pack]
+    define can_use: grant
+    define can_be_invoked: can_invoke
+
+type service_principal
+  relations
+    define of_agent: [agent]
+    define can_use_connector: [connector]
+
+type connector
+  relations
+    define allowed_sp: [service_principal]
+    define can_access: [resource]
+
+type resource
+  relations
+    define owner: [user]
+    define viewer: owner or manager from owner or data_viewer from owner
+    define can_query: [service_principal, connector#allowed_sp]
+    define can_submit: [service_principal, connector#allowed_sp]

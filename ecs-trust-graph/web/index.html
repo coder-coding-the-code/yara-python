@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ECS Guardian Trust · Agent Trust Graph</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark">GT</span>
+      <div>
+        <h1>ECS Guardian Trust</h1>
+        <p>Agent Trust Graph · NetworkX 属性图 · Cedar 判定</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="health" class="pill">connecting</span>
+      <button id="btn-reset" class="ghost">重置演示数据</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>场景</h2>
+      <div id="scenarios" class="scenario-list"></div>
+      <h2>维护动作</h2>
+      <div class="actions">
+        <button id="btn-share">李四分享数据给张三</button>
+        <button id="btn-offboard">张三离职（吊销委托）</button>
+        <button id="btn-lisi">李四提交本人报销</button>
+        <button id="btn-approve">签发超额审批票据后再评 8000</button>
+      </div>
+      <h2>evaluate 自定义</h2>
+      <form id="eval-form" class="eval-form">
+        <label>发起人 <input name="initiator_human_id" value="zhangsan" /></label>
+        <label>执行 Agent <input name="actor_agent_id" value="erp-docs" /></label>
+        <label>动作
+          <select name="action">
+            <option>submit</option>
+            <option>query</option>
+          </select>
+        </label>
+        <label>资源 <input name="resource_id" value="expense-api" /></label>
+        <label>数据归属 <input name="data_owner_id" placeholder="默认=发起人" /></label>
+        <label>金额 <input name="amount" type="number" value="1200" /></label>
+        <label>调用链 <input name="chain" value="expense-orchestrator,invoice-ocr,erp-docs" /></label>
+        <label>能力包
+          <select name="pack_id">
+            <option value="expense-orch">expense-orch（报销编排）</option>
+          </select>
+        </label>
+        <button type="submit">执行 evaluate</button>
+      </form>
+    </section>
+
+    <section class="panel graph-panel">
+      <div class="graph-head">
+        <h2>信任图</h2>
+        <div class="legend">
+          <span class="dot user"></span>人
+          <span class="dot agent"></span>Agent
+          <span class="dot pack"></span>能力包
+          <span class="dot sp"></span>SP
+          <span class="dot connector"></span>连接器
+          <span class="dot resource"></span>资源
+        </div>
+      </div>
+      <svg id="graph" viewBox="0 0 980 640" role="img" aria-label="Trust Graph"></svg>
+    </section>
+
+    <section class="panel">
+      <h2>判定结果</h2>
+      <div id="decision" class="decision empty">选择左侧场景开始判定</div>
+      <h2>影响面 / 审计</h2>
+      <pre id="side" class="log"></pre>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
