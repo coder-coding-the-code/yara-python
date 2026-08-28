@@ -6,7 +6,7 @@ from ecs_trust.seed import build_demo
 
 def test_health_and_evaluate_via_http():
     client = TestClient(create_app(build_demo()))
-    assert client.get("/api/health").json()["engine"] == "openfga-rebac"
+    assert client.get("/api/health").json()["engine"] == "cedar-graph"
     payload = {
         "initiator_human_id": "zhangsan",
         "actor_agent_id": "erp-docs",

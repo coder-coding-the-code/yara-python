@@ -1,51 +1,30 @@
-from ecs_trust.dsl import DirectUserset, UnionRewrite, parse_dsl, parse_rewrite
-from ecs_trust.seed import MODEL_PATH, build_demo
+from ecs_trust.packs import EXPENSE_ORCH
+from ecs_trust.seed import build_demo
 
 
-def test_type_restriction_keeps_hash_userset():
-    rewrite = parse_rewrite("[user, pack#grantee]")
-    assert rewrite == DirectUserset(("user", "pack#grantee"))
-
-
-def test_model_parses_resource_viewer():
-    model = parse_dsl(MODEL_PATH.read_text(encoding="utf-8"))
-    viewer = model.rewrite("resource", "viewer")
-    assert isinstance(viewer, UnionRewrite)
-    kinds = [type(c).__name__ for c in viewer.children]
-    assert "ComputedUserset" in kinds
-    assert "TupleToUserset" in kinds
-
-
-def test_pack_grant_expands_to_entry_and_terminal():
+def test_no_user_to_internal_agent_grant_edges():
     tm = build_demo()
-    orch = tm.pack("expense-orch")
-    strict = tm.pack("expense-strict")
-    assert tm.has_user_grant("user:zhangsan", "agent:expense-orchestrator", orch)
-    assert tm.has_user_grant("user:zhangsan", "agent:erp-docs", orch)
-    assert not tm.has_user_grant("user:zhangsan", "agent:invoice-ocr", orch)
-    assert tm.has_user_grant("user:zhangsan", "agent:invoice-ocr", strict)
+    grants = [
+        (u, d.get("relation"), v)
+        for u, v, d in tm.graph.g.edges(data=True)
+        if d.get("relation") == "GRANTED"
+    ]
+    assert ("user:zhangsan", "GRANTED", "pack:expense-orch") in grants
+    assert not any(v == "agent:invoice-ocr" for _u, _r, v in grants)
+    assert not any(v == "agent:erp-docs" for _u, _r, v in grants)
 
 
-def test_invoke_edges():
+def test_snapshot_covers_expense_not_bank():
     tm = build_demo()
-    assert tm.check("agent:expense-orchestrator", "can_invoke", "agent:invoice-ocr")
-    assert tm.check("agent:invoice-ocr", "can_invoke", "agent:erp-docs")
-    assert not tm.check("agent:expense-orchestrator", "can_invoke", "agent:erp-docs")
+    snap = tm.graph.effective_snapshot("zhangsan", "expense-orch")
+    assert "resource:expense-api" in snap["resources"]
+    assert "resource:bank-pay-api" not in snap["resources"]
+    assert "agent:erp-docs" in snap["egress"]
+    assert "agent:invoice-ocr" not in snap["egress"]
 
 
-def test_sp_can_submit_expense_not_bank():
-    tm = build_demo()
-    sp = "service_principal:erp-docs-prod"
-    assert tm.check(sp, "can_submit", "resource:expense-api")
-    assert tm.check(sp, "can_query", "resource:expense-api")
-    assert not tm.check(sp, "can_submit", "resource:bank-pay-api")
-    assert not tm.check("service_principal:ocr-prod", "can_submit", "resource:expense-api")
-
-
-def test_document_viewer_owner_manager_share():
-    tm = build_demo()
-    assert tm.check("user:lisi", "viewer", "resource:lisi-expense-doc")
-    assert not tm.check("user:zhangsan", "viewer", "resource:lisi-expense-doc")
-    assert tm.check("user:zhaoliu", "viewer", "resource:lisi-expense-doc")
-    tm.share_data("lisi", "zhangsan")
-    assert tm.check("user:zhangsan", "viewer", "resource:lisi-expense-doc")
+def test_pack_members_match_roles():
+    pack = EXPENSE_ORCH
+    assert pack.entry == "agent:expense-orchestrator"
+    assert "agent:invoice-ocr" in pack.workers
+    assert set(pack.workers).isdisjoint(pack.egress_agents())

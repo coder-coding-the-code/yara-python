@@ -1,124 +1,53 @@
-"""Seed the expense-assistant Trust Graph used across design-doc scenarios."""
+"""Seed the v2 expense graph."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from .cedar_authz import CedarEngine
+from .graphstore import TrustGraph
 from .manager import TrustManager
-from .packs import default_packs
-from .rebac import ReBAC
-from .registry import (
-    AgentRecord,
-    AgentRegistry,
-    ConnectorRecord,
-    HumanPrincipal,
-    ResourceRecord,
-    ServicePrincipalRecord,
-)
-
-MODEL_PATH = Path(__file__).resolve().parent.parent / "openfga" / "model.fga"
+from .packs import default_packs, _oid
 
 
 def build_demo() -> TrustManager:
-    rebac = ReBAC.from_model_file(MODEL_PATH)
-    registry = AgentRegistry()
-    packs = default_packs()
-    tm = TrustManager(rebac, registry, packs)
+    g = TrustGraph()
+    g.add("user:zhangsan", "user", "张三", org="org:finance-demo", role="employee", status="active")
+    g.add("user:lisi", "user", "李四", org="org:finance-demo", role="employee", status="active")
+    g.add("user:wangwu", "user", "王五", org="org:finance-demo", role="finance_bp", status="active")
+    g.add("user:zhaoliu", "user", "赵六", org="org:finance-demo", role="manager", status="active")
 
-    registry.put_human(HumanPrincipal("zhangsan", "张三", "org:finance-demo", "张三", "employee"))
-    registry.put_human(HumanPrincipal("lisi", "李四", "org:finance-demo", "李四", "employee"))
-    registry.put_human(HumanPrincipal("wangwu", "王五", "org:finance-demo", "王五", "finance_bp"))
-    registry.put_human(HumanPrincipal("zhaoliu", "赵六", "org:finance-demo", "赵六", "manager"))
+    g.add("agent:expense-orchestrator", "agent", "报销编排助手", role="entry")
+    g.add("agent:invoice-ocr", "agent", "发票识别", role="worker")
+    g.add("agent:erp-docs", "agent", "ERP 单据 Agent", role="egress")
 
-    registry.put_agent(
-        AgentRecord(
-            "expense-orchestrator",
-            "报销编排助手",
-            "orchestrator",
-            require_user_grant=True,
-            is_entry=True,
-            risk_level="L1",
-        )
-    )
-    registry.put_agent(
-        AgentRecord(
-            "invoice-ocr",
-            "发票识别",
-            "tool",
-            require_user_grant=False,
-            risk_level="L1",
-        )
-    )
-    registry.put_agent(
-        AgentRecord(
-            "erp-docs",
-            "ERP 单据 Agent",
-            "resource_access",
-            require_user_grant=True,
-            risk_level="L2",
-        )
-    )
+    g.add("service_principal:orch-prod", "service_principal", "orch-prod", env="prod", status="active", agent="expense-orchestrator")
+    g.add("service_principal:ocr-prod", "service_principal", "ocr-prod", env="prod", status="active", agent="invoice-ocr")
+    g.add("service_principal:erp-docs-prod", "service_principal", "erp-docs-prod", env="prod", status="active", agent="erp-docs")
 
-    registry.put_sp(ServicePrincipalRecord("orch-prod", "expense-orchestrator", scopes=["orchestrate"]))
-    registry.put_sp(ServicePrincipalRecord("ocr-prod", "invoice-ocr", scopes=["ocr"]))
-    registry.put_sp(ServicePrincipalRecord("erp-docs-prod", "erp-docs", scopes=["expense.query", "expense.submit"]))
+    g.add("connector:erp", "connector", "ERP 财务连接器")
+    g.add("resource:expense-api", "resource", "报销单 API", classification="internal", risk_level="L2")
+    g.add("resource:bank-pay-api", "resource", "银行付款 API", classification="restricted", risk_level="L4")
+    g.add("resource:lisi-expense-doc", "resource", "李四报销单", classification="pii", risk_level="L2", personal=True)
+    g.add("resource:zhangsan-expense-doc", "resource", "张三报销单", classification="pii", risk_level="L2", personal=True)
 
-    registry.put_connector(ConnectorRecord("erp", "ERP 财务连接器", "ERP"))
-    registry.put_resource(ResourceRecord("expense-api", "报销单 API", "internal", "L2"))
-    registry.put_resource(ResourceRecord("bank-pay-api", "银行付款 API", "restricted", "L4"))
-    registry.put_resource(ResourceRecord("lisi-expense-doc", "李四报销单", "pii", "L2", personal=True))
-    registry.put_resource(ResourceRecord("zhangsan-expense-doc", "张三报销单", "pii", "L2", personal=True))
+    g.edge("user:zhaoliu", "MANAGER", "user:zhangsan")
+    g.edge("user:zhaoliu", "MANAGER", "user:lisi")
+    g.edge("user:wangwu", "OWNS", "agent:expense-orchestrator")
+    g.edge("user:wangwu", "OWNS", "agent:invoice-ocr")
+    g.edge("user:wangwu", "OWNS", "agent:erp-docs")
+    g.edge("agent:expense-orchestrator", "RUNS_AS", "service_principal:orch-prod")
+    g.edge("agent:invoice-ocr", "RUNS_AS", "service_principal:ocr-prod")
+    g.edge("agent:erp-docs", "RUNS_AS", "service_principal:erp-docs-prod")
+    g.edge("service_principal:erp-docs-prod", "CAN_QUERY", "resource:expense-api")
+    g.edge("service_principal:erp-docs-prod", "CAN_SUBMIT", "resource:expense-api")
+    g.edge("user:zhangsan", "OWNS", "resource:zhangsan-expense-doc")
+    g.edge("user:lisi", "OWNS", "resource:lisi-expense-doc")
 
-    r = rebac.write
-    r("user:zhaoliu", "manager", "user:zhangsan")
-    r("user:zhaoliu", "manager", "user:lisi")
+    for pack in default_packs().values():
+        g.put_pack(pack)
+    g.grant("zhangsan", "expense-orch")
+    g.grant("lisi", "expense-orch")
 
-    r("user:wangwu", "owner", "agent:expense-orchestrator")
-    r("user:wangwu", "owner", "agent:invoice-ocr")
-    r("user:wangwu", "owner", "agent:erp-docs")
-
-    r("agent:expense-orchestrator", "entry", "pack:expense-orch")
-    r("agent:expense-orchestrator", "member", "pack:expense-orch")
-    r("agent:invoice-ocr", "member", "pack:expense-orch")
-    r("agent:erp-docs", "member", "pack:expense-orch")
-    r("agent:expense-orchestrator", "user_granted", "pack:expense-orch")
-    r("agent:erp-docs", "user_granted", "pack:expense-orch")
-
-    r("agent:expense-orchestrator", "entry", "pack:expense-strict")
-    for agent in (
-        "agent:expense-orchestrator",
-        "agent:invoice-ocr",
-        "agent:erp-docs",
-    ):
-        r(agent, "member", "pack:expense-strict")
-        r(agent, "user_granted", "pack:expense-strict")
-
-    r("user:zhangsan", "grantee", "pack:expense-orch")
-    r("user:lisi", "grantee", "pack:expense-orch")
-    r("user:zhangsan", "grantee", "pack:expense-strict")
-
-    r("pack:expense-orch#grantee", "grant", "agent:expense-orchestrator")
-    r("pack:expense-orch#grantee", "grant", "agent:erp-docs")
-    r("pack:expense-strict#grantee", "grant", "agent:expense-orchestrator")
-    r("pack:expense-strict#grantee", "grant", "agent:invoice-ocr")
-    r("pack:expense-strict#grantee", "grant", "agent:erp-docs")
-
-    r("agent:expense-orchestrator", "can_invoke", "agent:invoice-ocr")
-    r("agent:invoice-ocr", "can_invoke", "agent:erp-docs")
-
-    r("service_principal:orch-prod", "runs_as", "agent:expense-orchestrator")
-    r("service_principal:ocr-prod", "runs_as", "agent:invoice-ocr")
-    r("service_principal:erp-docs-prod", "runs_as", "agent:erp-docs")
-    r("agent:expense-orchestrator", "in_pack", "pack:expense-orch")
-    r("agent:invoice-ocr", "in_pack", "pack:expense-orch")
-    r("agent:erp-docs", "in_pack", "pack:expense-orch")
-
-    r("service_principal:erp-docs-prod", "can_use_connector", "connector:erp")
-    r("service_principal:erp-docs-prod", "allowed_sp", "connector:erp")
-    r("resource:expense-api", "can_access", "connector:erp")
-    r("connector:erp#allowed_sp", "can_query", "resource:expense-api")
-    r("connector:erp#allowed_sp", "can_submit", "resource:expense-api")
-
-    r("user:zhangsan", "owner", "resource:zhangsan-expense-doc")
-    r("user:lisi", "owner", "resource:lisi-expense-doc")
-    return tm
+    errors = g.validate()
+    if errors:
+        raise ValueError("invalid trust graph: " + "; ".join(errors))
+    return TrustManager(g, CedarEngine())

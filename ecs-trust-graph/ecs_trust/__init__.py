@@ -1,8 +1,7 @@
-"""ECS Guardian Trust — Agent Trust Graph (OpenFGA-aligned ReBAC)."""
+"""ECS Guardian Trust v2 — attributed graph + Cedar."""
 
 from .manager import TrustManager
-from .rebac import ReBAC
-from .registry import AgentRegistry
+from .graphstore import TrustGraph
 
-__all__ = ["TrustManager", "ReBAC", "AgentRegistry"]
-__version__ = "0.1.0"
+__all__ = ["TrustManager", "TrustGraph"]
+__version__ = "0.2.0"

@@ -1,8 +1,8 @@
 model
   schema 1.1
 
-# ECS Guardian Trust — Agent Trust Graph
-# 对应 docs/ECS-Trust-Graph-OpenFGA-Model.md（方案一 + 能力包）
+# ECS Guardian Trust — Agent Trust Graph (v1 archive)
+# 已被 v2（NetworkX + Cedar）取代，见 docs/ECS-Trust-Graph-v2-Design.md
 # 关系进图；require_user_grant 放 Registry；金额/深度/风险放策略层。
 
 type user

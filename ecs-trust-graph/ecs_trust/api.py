@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .manager import EvaluateResult, TrustManager
+from .manager import Decision, TrustManager
 from .seed import build_demo
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -69,7 +69,7 @@ def create_app(manager: TrustManager | None = None) -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"status": "ok", "product": "guardian-trust", "engine": "openfga-rebac"}
+        return {"status": "ok", "product": "guardian-trust", "engine": "cedar-graph"}
 
     @app.get("/api/registry")
     def registry(request: Request) -> dict:
@@ -81,10 +81,11 @@ def create_app(manager: TrustManager | None = None) -> FastAPI:
 
     @app.get("/api/tuples")
     def tuples(request: Request) -> dict:
+        g = _tm(request).graph.g
         return {
             "tuples": [
-                {"user": t.user, "relation": t.relation, "object": t.object}
-                for t in _tm(request).rebac.tuples()
+                {"user": u, "relation": d.get("relation"), "object": v}
+                for u, v, d in g.edges(data=True)
             ]
         }
 
@@ -156,7 +157,7 @@ def create_app(manager: TrustManager | None = None) -> FastAPI:
     return app
 
 
-def _result_dict(result: EvaluateResult) -> dict:
+def _result_dict(result: Decision) -> dict:
     return {
         "allow": result.allow,
         "decision": result.decision,
@@ -171,6 +172,7 @@ def _result_dict(result: EvaluateResult) -> dict:
         "pack_id": result.pack_id,
         "pack_version": result.pack_version,
         "audit_id": result.audit_id,
+        "task_id": result.task_id,
     }
 
 
@@ -234,7 +236,7 @@ SCENARIOS = [
     },
     {
         "id": "chain-ok",
-        "title": "方案一：A→B（免检）→C（强检）",
+        "title": "A 编排 → B 内部 OCR → C 出站 ERP",
         "expect": "allow",
         "request": {
             "initiator_human_id": "zhangsan",
@@ -246,16 +248,17 @@ SCENARIOS = [
         },
     },
     {
-        "id": "scheme2-ocr-requires-grant",
-        "title": "方案二：进入发票识别也要 User→B",
-        "expect": "allow",
+        "id": "worker-egress-deny",
+        "title": "内部 OCR 直接提交报销（应拒绝）",
+        "expect": "deny",
         "request": {
             "initiator_human_id": "zhangsan",
-            "actor_agent_id": "erp-docs",
-            "action": "query",
+            "actor_agent_id": "invoice-ocr",
+            "action": "submit",
             "resource_id": "expense-api",
-            "delegation_chain": ["expense-orchestrator", "invoice-ocr", "erp-docs"],
-            "pack_id": "expense-strict",
+            "amount": 100,
+            "delegation_chain": ["expense-orchestrator", "invoice-ocr"],
+            "pack_id": "expense-orch",
         },
     },
 ]
